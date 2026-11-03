@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NewsAgent Prototype v3</title>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <style>
+        :root {
+            --bg-black: #050505;
+            --bg-dark: #0a0a0a;
+            --text-white: #E5E5E5;
+            --text-muted: #777777;
+            --accent-blue: #3B82F6;
+            --glass-bg: linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --base-size: 13px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', sans-serif;
+            border-radius: 0 !important; /* 철저한 직각 디자인 */
+        }
+
+        body {
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: var(--text-white);
+            font-size: var(--base-size);
+        }
+
+        #app {
+            width: 100%;
+            max-width: 400px;
+            height: 100vh;
+            max-height: 850px;
+            background-color: var(--bg-black);
+            position: relative;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 15px 15px;
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glow-bg {
+            position: absolute;
+            top: -50px; left: -50px; width: 250px; height: 250px;
+            background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%);
+            z-index: 0; pointer-events: none;
+        }
+
+        .screen {
+            flex: 1; display: none; flex-direction: column;
+            z-index: 10; background: transparent; overflow: hidden;
+        }
+        .screen.active { display: flex; }
+
+        /* 공통 헤더 */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 18px; border-bottom: 1px solid var(--glass-border);
+            background: rgba(5, 5, 5, 0.85); backdrop-filter: blur(8px); z-index: 20;
+        }
+        
+        .logo { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .logo-n {
+            background: linear-gradient(135deg, #FFFFFF 0%, #666666 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            font-size: 1.3rem; font-weight: 900;
+        }
+        .logo-text { font-size: 0.95rem; font-weight: 500; letter-spacing: -0.3px; color: #fff; }
+
+        .content {
+            flex: 1; overflow-y: auto; padding: 18px; padding-bottom: 80px;
+        }
+        .content::-webkit-scrollbar { width: 0; }
+
+        /* 홈 - 카테고리 탭 */
+        .category-scroll {
+            display: flex; overflow-x: auto; border-bottom: 1px solid var(--glass-border);
+            background: var(--bg-black); padding: 0 10px;
+        }
+        .category-scroll::-webkit-scrollbar { display: none; }
+        .cat-item {
+            padding: 12px 14px; font-size: 0.85rem; color: var(--text-muted);
+            white-space: nowrap; cursor: pointer; transition: 0.2s;
+        }
+        .cat-item.active { color: #fff; border-bottom: 2px solid var(--accent-blue); font-weight: 600; }
+
+        /* 홈 - 글래스 카드 */
+        .glass-card {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            padding: 18px; margin-bottom: 20px; backdrop-filter: blur(10px);
+            position: relative; cursor: pointer;
+        }
+        .glass-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 2px; height: 100%;
+            background-color: var(--accent-blue);
+        }
+        .live-indicator {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 0.7rem; color: var(--accent-blue); font-weight: 600; margin-bottom: 10px;
+        }
+        .dot {
+            width: 5px; height: 5px; background-color: var(--accent-blue);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 5px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .card-title { font-size: 1.15rem; font-weight: 600; line-height: 1.4; margin-bottom: 8px; color: #fff; }
+        
+        /* 피드 리스트 */
+        .feed-item { padding: 16px 0; border-bottom: 1px solid var(--glass-border); cursor: pointer; }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-meta { font-size: 0.75rem; color: var(--accent-blue); margin-bottom: 4px; }
+        .feed-title { font-size: 0.95rem; font-weight: 400; line-height: 1.5; color: #ddd; }
+
+        /* --- 기사 상세 화면 --- */
+        .detail-title { font-size: 1.15rem; font-weight: 600; line-height: 1.4; margin-bottom: 16px; color: #fff; }
+        .fact-box {
+            border: 1px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.03);
+            padding: 14px 16px; margin-bottom: 24px;
+        }
+        .fact-box h3 {
+            font-size: 0.8rem; color: var(--accent-blue); margin-bottom: 10px; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .fact-box h3::before { content: '✨'; font-size: 0.9rem; }
+        .fact-list { list-style: none; }
+        .fact-list li {
+            position: relative; padding-left: 10px; margin-bottom: 8px; font-size: 0.85rem; line-height: 1.5; color: #ccc;
+        }
+        .fact-list li:last-child { margin-bottom: 0; }
+        .fact-list li::before {
+            content: ''; position: absolute; left: 0; top: 6px; width: 3px; height: 3px; background-color: var(--text-muted);
+        }
+
+        /* 3단 탭 메뉴 */
+        .tabs {
+            display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 16px;
+            position: sticky; top: 0; background: var(--bg-black); z-index: 5;
+        }
+        .tab {
+            flex: 1; text-align: center; padding: 10px 0;
+            color: var(--text-muted); font-size: 0.85rem; cursor: pointer; transition: 0.2s;
+        }
+        .tab.active { color: #fff; border-bottom: 1px solid var(--accent-blue); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 탭 1: 타임라인 */
+        .timeline-container { padding-left: 10px; margin-top: 10px; border-left: 1px solid var(--glass-border); }
+        .timeline-item { position: relative; padding-left: 16px; margin-bottom: 20px; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -14px; top: 4px;
+            width: 7px; height: 7px; background: var(--accent-blue);
+        }
+        .timeline-date { font-size: 0.75rem; color: var(--accent-blue); margin-bottom: 4px; font-weight: 600; }
+        .timeline-text { font-size: 0.85rem; color: #ccc; line-height: 1.4; }
+
+        /* 탭 2: 논조 분석 (게이지 바) */
+        .gauge-container { margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); }
+        .gauge-labels { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; }
+        .gauge-track { width: 100%; height: 4px; background: var(--glass-border); position: relative; }
+        .gauge-fill {
+            position: absolute; top: 0; left: 20%; width: 60%; height: 100%;
+            background: var(--accent-blue); box-shadow: 0 0 10px var(--accent-blue);
+        }
+
+        /* 탭 3: 관련 기사 (10개) */
+        .news-article { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; }
+        .news-article:hover { background: rgba(255,255,255,0.02); }
+        .news-publisher { font-size: 0.75rem; color: #888; width: 45px; flex-shrink: 0; font-weight: 500; }
+        .news-title { font-size: 0.85rem; color: #ccc; line-height: 1.4; }
+
+        /* --- 커스터마이즈(맞춤설정) 화면 --- */
+        .setting-section { margin-bottom: 30px; }
+        .setting-title { font-size: 0.95rem; color: #fff; margin-bottom: 12px; font-weight: 600; }
+        .tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+        .pref-tag {
+            padding: 10px 16px; border: 1px solid var(--glass-border);
+            color: var(--text-muted); font-size: 0.85rem; cursor: pointer; transition: 0.2s;
+        }
+        .pref-tag.active {
+            border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(59, 130, 246, 0.05);
+        }
+        .save-btn {
+            width: 100%; padding: 14px; background: var(--accent-blue); color: #fff;
+            border: none; font-size: 0.95rem; font-weight: 600; margin-top: 20px; cursor: pointer;
+        }
+
+        /* --- 챗봇 화면 --- */
+        .chat-container { display: flex; flex-direction: column; gap: 16px; padding-bottom: 80px;}
+        .chat-bubble { max-width: 85%; padding: 14px; font-size: 0.85rem; line-height: 1.5; }
+        .chat-user { align-self: flex-end; background: #1a1a1a; border: 1px solid var(--glass-border); color: #ccc; }
+        .chat-ai { align-self: flex-start; border-left: 2px solid var(--accent-blue); padding-left: 12px; }
+        .chat-input-area {
+            position: absolute; bottom: 60px; left: 0; width: 100%;
+            padding: 12px; background: var(--bg-black); border-top: 1px solid var(--glass-border);
+            display: flex; gap: 8px; z-index: 25;
+        }
+        .chat-input {
+            flex: 1; background: transparent; border: 1px solid var(--glass-border);
+            color: #fff; padding: 10px; font-size: 0.85rem; outline: none;
+        }
+        .chat-input:focus { border-color: var(--accent-blue); }
+        .send-btn { background: var(--accent-blue); color: #fff; border: none; width: 40px; cursor: pointer; }
+
+        /* 하단 네비게이션 바 */
+        .bottom-nav {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 60px;
+            background: var(--bg-dark); border-top: 1px solid var(--glass-border);
+            display: flex; justify-content: space-around; align-items: center; z-index: 30;
+        }
+        .nav-btn {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            color: var(--text-muted); font-size: 0.7rem; cursor: pointer;
+        }
+        .nav-btn.active { color: #fff; }
+        .nav-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+        .nav-btn.active svg { stroke: var(--accent-blue); }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="glow-bg"></div>
+
+    <!-- [1] 홈 화면 -->
+    <div id="screen-home" class="screen active">
+        <header>
+            <div class="logo">
+                <span class="logo-n">N</span> <span class="logo-text">NewsAgent</span>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" stroke="#fff"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </header>
+        <div class="category-scroll">
+            <div class="cat-item active">전체</div><div class="cat-item">사회</div><div class="cat-item">경제</div>
+            <div class="cat-item">문화</div><div class="cat-item">IT/과학</div><div class="cat-item">정치</div><div class="cat-item">국제</div>
+        </div>
+        <div class="content">
+            <div class="live-indicator"><div class="dot"></div> TODAY'S BRIEFING</div>
+            <div class="glass-card" onclick="goToScreen('screen-detail')">
+                <div class="card-title">"금융위, 공매도 전면 금지 내년 3월까지 연장 검토"</div>
+                <div class="feed-meta" style="color:var(--text-muted)">조회수 급상승 • 10분 전 분석 완료</div>
+            </div>
+            <div class="feed-item" onclick="goToScreen('screen-detail')"><div class="feed-meta">경제</div><div class="feed-title">美 연준 금리 동결, 파월 의장의 매파적 발언 숨은 의미</div></div>
+            <div class="feed-item"><div class="feed-meta">IT/과학</div><div class="feed-title">애플, AI 반도체 자체 개발 가속화... 밸류체인 지각변동</div></div>
+            <div class="feed-item"><div class="feed-meta">정치</div><div class="feed-title">여야, 예산안 처리 시한 넘겨... 핵심 쟁점은?</div></div>
+        </div>
+    </div>
+
+    <!-- [2] 기사 상세 화면 -->
+    <div id="screen-detail" class="screen">
+        <header>
+            <div style="cursor: pointer;" onclick="goToScreen('screen-home')">
+                <svg width="20" height="20" viewBox="0 0 24 24" stroke="#fff"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </div>
+            <div style="font-size: 0.85rem;">이슈 분석</div>
+            <div style="width: 20px;"></div>
+        </header>
+        <div class="content">
+            <h2 class="detail-title">"금융위, 공매도 전면 금지 내년 3월까지 연장 검토"</h2>
+            <div class="fact-box">
+                <h3>AI 브리핑</h3>
+                <ul class="fact-list">
+                    <li>금융위는 시스템 개선 지연을 이유로 연장을 유력 검토 중입니다.</li>
+                    <li>외국인 투자자 이탈에 대한 우려가 제기되고 있습니다.</li>
+                    <li>최종 결정은 다음 주 정례회의에서 발표될 예정입니다.</li>
+                </ul>
+            </div>
+
+            <!-- 3단 탭 메뉴 -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('timeline', this)">타임라인</div>
+                <div class="tab" onclick="switchTab('tone', this)">논조 분석</div>
+                <div class="tab" onclick="switchTab('news', this)">관련 기사</div>
+            </div>
+
+            <!-- 탭 내용 1: 타임라인 -->
+            <div id="tab-timeline" class="tab-content active">
+                <div class="timeline-container">
+                    <div class="timeline-item"><div class="timeline-date">2023.11.05</div><div class="timeline-text">공매도 전면 금지 최초 시행</div></div>
+                    <div class="timeline-item"><div class="timeline-date">2024.04.15</div><div class="timeline-text">금감원, 불법 공매도 방지 전산시스템 구축 방안 발표</div></div>
+                    <div class="timeline-item"><div class="timeline-date">2024.06.12 (현재)</div><div class="timeline-text">금융위, 전산시스템 완비 전까지 내년 3월로 연장 검토 유력</div></div>
+                </div>
+            </div>
+
+            <!-- 탭 내용 2: 논조 분석 -->
+            <div id="tab-tone" class="tab-content">
+                <div class="gauge-container">
+                    <div class="gauge-labels"><span>규제 강화 (보수적)</span><span>시장 자율 (진보적)</span></div>
+                    <div class="gauge-track"><div class="gauge-fill"></div></div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; line-height: 1.5;">
+                        현재 언론 지형은 규제 강화(60%)에 약간 더 무게를 두고 보도하고 있습니다.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 탭 내용 3: 관련 기사 (10개) -->
+            <div id="tab-news" class="tab-content">
+                <div class="news-article"><span class="news-publisher">A일보</span><span class="news-title">금융위, 공매도 금지 연장 가닥…내년 3월 유력</span></div>
+                <div class="news-article"><span class="news-publisher">B경제</span><span class="news-title">시스템 미비에 또 미뤄진 공매도 재개…외국인 이탈 어쩌나</span></div>
+                <div class="news-article"><span class="news-publisher">C뉴스</span><span class="news-title">[단독] 금융위, 다음주 공매도 연장안 상정</span></div>
+                <div class="news-article"><span class="news-publisher">D방송</span><span class="news-title">개미들은 환호하지만…공매도 연장에 엇갈린 시선</span></div>
+                <div class="news-article"><span class="news-publisher">E일보</span><span class="news-title">MSCI 선진국 편입 또 물건너가나…공매도 금지 장기화</span></div>
+                <div class="news-article"><span class="news-publisher">F신문</span><span class="news-title">여당 "개인투자자 보호 위해 공매도 연장 불가피"</span></div>
+                <div class="news-article"><span class="news-publisher">G경제</span><span class="news-title">전문가들 "시장 왜곡 우려…단계적 재개 필요"</span></div>
+                <div class="news-article"><span class="news-publisher">H미디어</span><span class="news-title">공매도 금지 1년…주가 하락 방어 효과 있었나</span></div>
+                <div class="news-article"><span class="news-publisher">I일보</span><span class="news-title">금융당국 "불법 공매도 적발 시스템 구축이 먼저"</span></div>
+                <div class="news-article"><span class="news-publisher">J통신</span><span class="news-title">공매도 연장 검토 소식에 이차전지주 일제히 반등</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- [3] 커스터마이즈 화면 (신규 추가) -->
+    <div id="screen-customize" class="screen">
+        <header>
+            <div style="font-size: 0.95rem; font-weight:600;">맞춤 설정</div>
+        </header>
+        <div class="content">
+            <div class="setting-section">
+                <div class="setting-title">관심 분야 구독 (다중 선택)</div>
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">선택한 분야의 이슈 브리핑을 우선적으로 제공합니다.</p>
+                <div class="tag-grid">
+                    <div class="pref-tag active" onclick="this.classList.toggle('active')">경제</div>
+                    <div class="pref-tag active" onclick="this.classList.toggle('active')">IT/과학</div>
+                    <div class="pref-tag" onclick="this.classList.toggle('active')">정치</div>
+                    <div class="pref-tag" onclick="this.classList.toggle('active')">사회</div>
+                    <div class="pref-tag" onclick="this.classList.toggle('active')">국제</div>
+                    <div class="pref-tag" onclick="this.classList.toggle('active')">문화</div>
+                </div>
+            </div>
+            
+            <div class="setting-section">
+                <div class="setting-title">차단 키워드 설정</div>
+                <input type="text" style="width:100%; padding:12px; background:var(--bg-black); border:1px solid var(--glass-border); color:#fff; font-size:0.85rem;" placeholder="보기 싫은 키워드를 입력하세요 (예: 연예, 사건)">
+            </div>
+
+            <button class="save-btn" onclick="goToScreen('screen-home')">설정 완료</button>
+        </div>
+    </div>
+
+    <!-- [4] 1:1 AI 챗봇 화면 -->
+    <div id="screen-chat" class="screen">
+        <header>
+            <div class="logo"><span class="logo-text" style="color:var(--accent-blue);">AI Partner</span></div>
+        </header>
+        <div class="content chat-container">
+            <div class="chat-ai chat-bubble">
+                공매도 연장 이슈를 보고 오셨군요.<br>이 결정이 개인 투자자와 기관에 각각 어떤 영향을 미칠지 브리핑해 드릴까요?
+            </div>
+            <div class="chat-user chat-bubble">
+                과거 금지 기간 동안 주가 변동성은 어땠어? 팩트만 알려줘.
+            </div>
+            <div class="chat-ai chat-bubble">
+                과거 3차례의 공매도 금지 기간 데이터를 분석한 결과입니다.<br><br>
+                - 1개월 차: 단기적 지수 상승 (평균 8.2%)<br>
+                - 3개월 이후: 외국인 자금 유출로 대형주 변동성 확대<br><br>
+                장기적인 하락장 방어 효과는 통계적으로 유의미하지 않았습니다.
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" placeholder="질문을 입력하세요...">
+            <button class="send-btn">➤</button>
+        </div>
+    </div>
+
+    <!-- 하단 고정 메뉴바 -->
+    <nav class="bottom-nav">
+        <div class="nav-btn active" onclick="goToScreen('screen-home', 0)">
+            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>홈</span>
+        </div>
+        <div class="nav-btn" onclick="goToScreen('screen-customize', 1)">
+            <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <span>맞춤설정</span>
+        </div>
+        <div class="nav-btn" onclick="goToScreen('screen-chat', 2)">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>AI 챗봇</span>
+        </div>
+        <div class="nav-btn" onclick="alert('마이페이지는 준비 중입니다.');">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>마이</span>
+        </div>
+    </nav>
+</div>
+
+<script>
+    // 1. 화면 전환 및 하단바 활성화
+    function goToScreen(screenId, navIndex) {
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+        
+        if(navIndex !== undefined) {
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.nav-btn')[navIndex].classList.add('active');
+        }
+    }
+
+    // 2. 상세 화면 3단 탭 전환 기능
+    function switchTab(tabName, clickedElement) {
+        // 탭 UI 활성화 처리
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        clickedElement.classList.add('active');
+        
+        // 탭 내용 활성화 처리
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabName).classList.add('active');
+    }
+</script>
+
+</body>
+</html>
